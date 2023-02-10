@@ -146,7 +146,7 @@ class TrainOps_step1(object):
             test_loader = DataLoader(test_dataset, batch_size = self.batch_size, shuffle=True, num_workers=8, pin_memory=True)
         else:
             # target_dir = '/mnt/nas2/data/fault_diagnosis/XJTU_SY/condition'+str(self.condition)
-            target_dir = '/mnt/nas2/data/fault_diagnosis/XJTU_SY'
+            target_dir = '/home/daming/workspace/nablas/jsw/data/XJTU_SY_DATA/Data/XJTU-SY_Bearing_Datasets'
             train_dataset = Dataload_XJTU_Step1(target_dir, self.condition, self.num_bearings, self.train_bearing, 2560, self.num_data_per_file, 0.05)
             train_loader = DataLoader(train_dataset, batch_size = self.batch_size, shuffle=True, num_workers=8, pin_memory=True)
         
@@ -896,7 +896,6 @@ if __name__ == '__main__':
     print("device : ")
     print(device)
     # device = torch.device("cuda:%s" % args.gpu)
-
     if args.dataset == 'femto':
         train = [1,2,3,4,5,6,7]
     else:
