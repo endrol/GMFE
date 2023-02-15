@@ -1,0 +1,21 @@
+params:
+  gpu: 0
+  condition: 1
+  num_bearings: 5
+  test_bearing: 2
+  epochs: 40
+  n_channels: 2
+  batch_size: 32
+  lr: 1e-4
+  discriminator_lr: 1e-4
+  lambda_unet: 50
+  lambda_domain: 1.0
+  mode: all
+  resize_width: 128
+  resize_height: 128
+  dropout: 1
+  save_model: ./save_model
+
+data:
+  dataset_name: xjtu
+  xjtu_dir: /home/daming/workspace/nablas/jsw/data/XJTU_SY_DATA/Data/XJTU-SY_Bearing_Datasets

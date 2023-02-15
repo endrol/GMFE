@@ -6,17 +6,17 @@ import sys
 import re
 import pandas as pd
 import cv2
-
+import pdb
 import torch.nn as nn
 from torch import optim
 import torch.autograd as autograd
-
+from pathlib import Path
 import matplotlib.image as im
 import torch
 import time
 import csv
 from unet_model import UNet_L3, UNet_L4, UNet_L5, Classifier_FCs, CNN_HS, Discriminator, DomainDiscriminator
-
+from omegaconf import OmegaConf
 from data_loader import Dataload_Step1, Dataload_Step1_FPT, Dataload_XJTU_Step1
 from create_NSP import scatterPlot, toRGB
 
@@ -24,6 +24,7 @@ from torch.utils.data import DataLoader, random_split
 import matplotlib.pyplot as plt
 import math
 from evaluate import evaluate_result
+import yaml
 
 from cvtorchvision import cvtransforms
 
@@ -31,32 +32,33 @@ import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning) 
 
 class TrainOps_step1(object):
-    def __init__(self, train_bearing, test_bearing, num_bearings, condition, device, epochs, batch_size, lr, discriminator_lr, lambda_unet, lambda_domain, n_channels, dropout, resize_width, resize_height, dataset):
-        self.train_bearing = train_bearing
-        self.test_bearing = test_bearing
-        self.num_bearings = num_bearings
-        self.condition = condition
-        self.device = device
-        self.epochs = epochs
-        self.batch_size = batch_size
-        self.lr = lr
-        self.discriminator_lr = discriminator_lr
-        self.lambda_unet = lambda_unet
-        self.lambda_domain = lambda_domain
-        self.n_channels = n_channels
-        self.dropout = dropout
-        self.resize_width = resize_width
-        self.resize_height = resize_height
-        self.dataset = dataset
+    def __init__(self, cfg):
+        self.train_bearing = cfg.params.train_bearing
+        self.test_bearing = cfg.params.test_bearing
+        self.num_bearings = cfg.params.num_bearings
+        self.condition = cfg.params.condition
+        self.device = cfg.params.device
+        self.epochs = cfg.params.epochs
+        self.batch_size = cfg.params.batch_size
+        self.lr = cfg.params.lr
+        self.discriminator_lr =cfg.params.discriminator_lr
+        self.lambda_unet = cfg.params.lambda_unet
+        self.lambda_domain = cfg.params.lambda_domain
+        self.n_channels = cfg.params.n_channels
+        self.dropout = cfg.params.dropout
+        self.resize_width = cfg.params.resize_width
+        self.resize_height = cfg.params.resize_height
+        self.dataset = cfg.data.dataset_name
+        self.xjtu_dir = cfg.data.xjtu_dir
 
-        self.net3_model_save_path = './save_model/GAN_unet_l3_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
-        self.net4_model_save_path = './save_model/GAN_unet_l4_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
-        self.net5_model_save_path = './save_model/GAN_unet_l5_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
+        self.net3_model_save_path = cfg.params.save_model+'/GAN_unet_l3_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
+        self.net4_model_save_path = cfg.params.save_model+'/GAN_unet_l4_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
+        self.net5_model_save_path = cfg.params.save_model+'/GAN_unet_l5_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
 
-        self.classfier_fcs_model_save_path = './save_model/GAN_classifier_FCs_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
-        self.discriminator_model_save_path = './save_model/GAN_discriminator_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
+        self.classfier_fcs_model_save_path = cfg.params.save_model+'/GAN_classifier_FCs_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
+        self.discriminator_model_save_path = cfg.params.save_model+'/GAN_discriminator_C'+str(self.condition)+ 'B'+ str(self.test_bearing) + '_dropout_' + str(self.dropout) + '_' + str(self.n_channels) + '.pth'
         
-        self.cnnhs_model_save_path = './save_model/cnnhs_model_C'+ str(self.condition) + 'B' + str(self.test_bearing) + '_' + str(self.n_channels) + '_dropout_' + str(self.dropout) +'.pth'
+        self.cnnhs_model_save_path = cfg.params.save_model+'/cnnhs_model_C'+ str(self.condition) + 'B' + str(self.test_bearing) + '_' + str(self.n_channels) + '_dropout_' + str(self.dropout) +'.pth'
         self.input_dimension = 2560
         self.num_data_per_file = 12
 
@@ -146,7 +148,7 @@ class TrainOps_step1(object):
             test_loader = DataLoader(test_dataset, batch_size = self.batch_size, shuffle=True, num_workers=8, pin_memory=True)
         else:
             # target_dir = '/mnt/nas2/data/fault_diagnosis/XJTU_SY/condition'+str(self.condition)
-            target_dir = '/home/daming/workspace/nablas/jsw/data/XJTU_SY_DATA/Data/XJTU-SY_Bearing_Datasets'
+            target_dir = self.xjtu_dir
             train_dataset = Dataload_XJTU_Step1(target_dir, self.condition, self.num_bearings, self.train_bearing, 2560, self.num_data_per_file, 0.05)
             train_loader = DataLoader(train_dataset, batch_size = self.batch_size, shuffle=True, num_workers=8, pin_memory=True)
         
@@ -869,68 +871,68 @@ class TrainOps_step1(object):
         return fpt
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--gpu", type=str, default='0', help="GPU number")
-    parser.add_argument("--condition", type=int, default=1, help="condition")
-    parser.add_argument("--num_bearings", type=int, default=7, help="the number of bearings")
-    parser.add_argument("--test_bearing", type=int, default=7, help="test_bearing")
-    parser.add_argument("--epoch", type=int, default=40, help="epoch")
-    parser.add_argument("--n_channels", type=int, default=2, help="n_channels, '0:original','1:1channel','2:2channels','3:manualNSP'")
-    parser.add_argument("--batch_size", type=int, default=32, help="batch_size")
-    parser.add_argument("--lr", type=float, default=1e-4, help="learning_rate")
-    parser.add_argument("--discriminator_lr", type=float, default=1e-4, help="learning_rate of discriminator")
-    parser.add_argument("--lambda_unet", type=float, default=20.0, help="lambda for loss function")
-    parser.add_argument("--lambda_domain", type=float, default=1.0, help="lambda3 for loss function")
-    parser.add_argument("--mode", type=str, default='train_unet', help=" 'train_unet', 'make_nsp', 'train_cnn_hs', 'get_fpt'")
-    parser.add_argument("--resize_width", type=int, default=128)
-    parser.add_argument("--resize_height", type=int, default=128)
-    parser.add_argument("--dropout", type=int, default=1)
-    parser.add_argument("--dataset", type=str, default='femto', help=" 'femto', 'xjtu'")
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--gpu", type=str, default='0', help="GPU number")
+    # parser.add_argument("--condition", type=int, default=1, help="condition")
+    # parser.add_argument("--num_bearings", type=int, default=7, help="the number of bearings")
+    # parser.add_argument("--test_bearing", type=int, default=7, help="test_bearing")
+    # parser.add_argument("--epoch", type=int, default=40, help="epoch")
+    # parser.add_argument("--n_channels", type=int, default=2, help="n_channels, '0:original','1:1channel','2:2channels','3:manualNSP'")
+    # parser.add_argument("--batch_size", type=int, default=32, help="batch_size")
+    # parser.add_argument("--lr", type=float, default=1e-4, help="learning_rate")
+    # parser.add_argument("--discriminator_lr", type=float, default=1e-4, help="learning_rate of discriminator")
+    # parser.add_argument("--lambda_unet", type=float, default=20.0, help="lambda for loss function")
+    # parser.add_argument("--lambda_domain", type=float, default=1.0, help="lambda3 for loss function")
+    # parser.add_argument("--mode", type=str, default='train_unet', help=" 'train_unet', 'make_nsp', 'train_cnn_hs', 'get_fpt'")
+    # parser.add_argument("--resize_width", type=int, default=128)
+    # parser.add_argument("--resize_height", type=int, default=128)
+    # parser.add_argument("--dropout", type=int, default=1)
+    # parser.add_argument("--dataset", type=str, default='femto', help=" 'femto', 'xjtu'")
 
-    args = parser.parse_args()
-
+    # args = parser.parse_args()
+    cfg = OmegaConf.load('./config.yaml')
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"  
-    os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)
+    os.environ["CUDA_VISIBLE_DEVICES"]=str(cfg.params.gpu)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print("device : ")
     print(device)
+    cfg.params.device = device
     # device = torch.device("cuda:%s" % args.gpu)
-    if args.dataset == 'femto':
+    if cfg.data.dataset_name == 'femto':
         train = [1,2,3,4,5,6,7]
     else:
         train = [1,2,3,4,5]
-    train.remove(args.test_bearing)
+    train.remove(cfg.params.test_bearing)
+    cfg.params.train_bearing = train
 
-    print('condition:', args.condition)
-    print('test_bearing:', args.test_bearing)
-    args.dropout = bool(args.dropout)
-    print (args.dropout)
+    print('condition:', cfg.params.condition)
+    print('test_bearing:', cfg.params.test_bearing)
+    cfg.params.dropout = bool(cfg.params.dropout)
+    print (cfg.params.dropout)
 
-    train = TrainOps_step1(train_bearing=train, test_bearing=args.test_bearing, num_bearings=args.num_bearings, condition=args.condition, device=device, epochs=args.epoch, batch_size=args.batch_size, 
-                            lr=args.lr, discriminator_lr=args.discriminator_lr, 
-                            lambda_unet=args.lambda_unet, lambda_domain=args.lambda_domain, n_channels=args.n_channels, dropout=args.dropout, resize_width=args.resize_width, resize_height=args.resize_height, dataset=args.dataset)
+    train = TrainOps_step1(cfg)
 
-    if args.mode == 'train_GAN':
+    if cfg.params.mode == 'train_GAN':
         train.train_GAN_merge()
 
-    elif args.mode == 'make_nsp':
+    elif cfg.params.mode == 'make_nsp':
         train.save_intermediate_imageset()
         train.make_nsp()
         train.train_cnn_hs()
         train.get_fpt()
 
-    elif args.mode == 'train_cnn_hs':
+    elif cfg.params.mode == 'train_cnn_hs':
         train.train_cnn_hs()
         train.get_fpt()
     
-    elif args.mode == 'get_fpt':
+    elif cfg.params.mode == 'get_fpt':
         train.get_fpt()
 
-    elif args.mode == 'intermediate':
+    elif cfg.params.mode == 'intermediate':
         train.save_intermediate_imageset()
     
-    elif args.mode == 'all':
+    elif cfg.params.mode == 'all':
         print('train GAN merge')
         train.train_GAN_merge()
         print('save intermediate imageset')
