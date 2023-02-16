@@ -398,7 +398,8 @@ class TrainOps_step1(object):
                 if self.dataset == 'femto':
                     target_dir = '/mnt/nas2/data/fault_diagnosis/FEMTO/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
                 else:
-                    target_dir = '/mnt/nas2/data/fault_diagnosis/XJTU_SY/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
+                    target_dir = self.xjtu_dir+'/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
+                    # target_dir = '/mnt/nas2/data/fault_diagnosis/XJTU_SY/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
 
                 if self.dropout:
                     save_dir = './MultiScale_NSP_2_Dropout/'+self.dataset + '_Step1/Bearing'+str(self.condition)+'_'+str(self.test_bearing) + '/' + 'Bearing'+ str(condition)+ '_' + str(bearing_idx+1)+'/'
@@ -532,7 +533,8 @@ class TrainOps_step1(object):
                 if self.dataset == 'femto':
                     target_dir = '/mnt/nas2/data/fault_diagnosis/FEMTO/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
                 else:
-                    target_dir = '/mnt/nas2/data/fault_diagnosis/XJTU_SY/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
+                    target_dir = self.xjtu_dir+'/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
+                    # target_dir = '/mnt/nas2/data/fault_diagnosis/XJTU_SY/condition'+str(condition)+ '/Bearing'+str(condition)+ '_' + str(bearing_idx+1)+'/'
                 
                 print('Start processing Bearing', bearing_idx+1)
                 
